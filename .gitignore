@@ -1,0 +1,15 @@
+__pycache__/
+!.env.example
+.DS_Store
+.env
+.env.*
+.venv/
+.wrangler/
+*.pyc
+out/
+out/*.npz
+out/*.png
+out/bot_state.pickle
+out/run.log
+site/config.js
+site/map/data/

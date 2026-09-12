@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Draw your plot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="/config.js"></script>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#2a323d;--ink:#e6edf3;--muted:#8b949e;
+  --accent:#58a6ff;--go:#2ea043;--warn:#d29922;--bad:#f85149}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);overflow:hidden;
+  font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:var(--ink);background:none;border:none;cursor:pointer}
+button:focus{outline:none}
+body.kbd button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#map{position:absolute;inset:0;background:#000;touch-action:pan-x pan-y}
+body.drawing #map{touch-action:none}
+.leaflet-container{background:#000;font-family:inherit}
+
+.bar{position:absolute;left:0;right:0;z-index:600;padding:10px 12px;
+  background:rgba(13,17,23,.94);backdrop-filter:blur(10px)}
+#top{top:0;border-bottom:1px solid var(--line);padding-top:max(10px,env(safe-area-inset-top))}
+
+#modes{display:flex;gap:6px;margin-top:8px}
+.mode,#modes .act{flex:1;padding:10px 4px;border-radius:8px;background:#1c232c;
+  color:var(--muted);font-size:12.5px;font-weight:650;text-align:center;white-space:nowrap}
+#modes .act:disabled{opacity:.4}
+.mode[aria-pressed="true"]{background:var(--accent);color:#06131f}
+#hint{margin-top:8px;font-size:12.5px;color:var(--muted);text-align:center;min-height:1.4em}
+
+#readout{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+#area{font-size:27px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#area.none{color:var(--muted);font-size:17px;font-weight:600}
+#acres{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+#pts{margin-left:auto;font-size:12px;color:var(--muted)}
+#save{display:block;width:100%;padding:17px 12px;border-radius:11px;
+  background:var(--go);color:#fff;font-size:17px;font-weight:750;letter-spacing:.01em;
+  box-shadow:0 2px 14px rgba(46,160,67,.32)}
+#save:disabled{background:#1c232c;color:var(--muted);box-shadow:none}
+#msg{margin-top:9px;font-size:13px;text-align:center;min-height:1.2em}
+.ok{color:var(--go)}.err{color:var(--bad)}
+@media (pointer:coarse){
+  input,select,textarea{font-size:16px}
+  /* pinch-zoom is the natural gesture on a phone, and the control collides
+     with the Send button in the bottom bar */
+  .leaflet-control-zoom{display:none}
+}
+/* keep map controls and attribution clear of the bottom bar, whatever its height */
+.leaflet-bottom.leaflet-right,.leaflet-bottom.leaflet-left{bottom:6px}
+.leaflet-control-attribution{font-size:10px}
+@media (hover:hover){.act:not(:disabled):hover{background:#232c37}
+  .mode:not([aria-pressed="true"]):hover{color:var(--ink)}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="bar" id="top">
+  <div id="readout">
+    <span id="area" class="none">No plot yet</span>
+    <span id="acres"></span>
+    <span id="pts"></span>
+  </div>
+  <button id="save" disabled>Draw your plot first</button>
+  <div id="modes">
+    <button class="mode" data-mode="tap" aria-pressed="true">Corners</button>
+    <button class="mode" data-mode="free" aria-pressed="false">Finger</button>
+    <button class="act" id="undo" disabled>Undo</button>
+    <button class="act" id="clear" disabled>Clear</button>
+  </div>
+  <div id="hint">Tap each corner of your field.</div>
+  <div id="msg"></div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+  addEventListener('keydown', function (e) { if (e.key === 'Tab') document.body.classList.add('kbd'); });
+  addEventListener('pointerdown', function () { document.body.classList.remove('kbd'); });
+
+  var qs = new URLSearchParams(location.search);
+  var TOKEN = qs.get('t') || '';
+  // Inside Telegram we hand the polygon back through Telegram itself
+  // (WebApp.sendData), so the bot needs no publicly reachable endpoint.
+  var TGRAW = (window.Telegram && window.Telegram.WebApp) || null;
+  // initData can come back empty even inside Telegram, which previously made us
+  // fall into the browser path: no sendData, and no auto-close.
+  var TG = (TGRAW && (TGRAW.initData ||
+                      (TGRAW.initDataUnsafe && TGRAW.initDataUnsafe.user) ||
+                      (TGRAW.platform && TGRAW.platform !== 'unknown'))) ? TGRAW : null;
+  var STORE = (window.FARM && window.FARM.store) || '';
+  if (TG) {
+    try {
+      TG.ready(); TG.expand();
+      // Without this a downward drag dismisses the Mini App, which made
+      // finger-tracing impossible. Bot API 7.7+; harmless where unsupported.
+      if (TG.MainButton && TG.MainButton.hide) TG.MainButton.hide();
+      if (TG.disableVerticalSwipes) TG.disableVerticalSwipes();
+      if (TG.isVerticalSwipesEnabled === true && TG.disableVerticalSwipes) TG.disableVerticalSwipes();
+    } catch (e) {}
+  }
+  var LAT = parseFloat(qs.get('lat')), LON = parseFloat(qs.get('lon'));
+  if (isNaN(LAT)) { LAT = 0; LON = 20; }
+
+  var map = L.map('map', { zoomControl: false, doubleClickZoom: false })
+             .setView([LAT, LON], 17);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 21, maxNativeZoom: 19, attribution: 'Esri World Imagery' }).addTo(map);
+  L.circleMarker([LAT, LON], { radius: 6, color: '#fff', weight: 2,
+    fillColor: '#58a6ff', fillOpacity: 1 }).addTo(map);
+
+  var pts = [], mode = 'tap';
+  var poly = L.polygon([], { color: '#58a6ff', weight: 2, fillColor: '#58a6ff',
+                             fillOpacity: .25 }).addTo(map);
+  var verts = L.layerGroup().addTo(map);
+  var $ = function (s) { return document.querySelector(s); };
+
+  function areaHa(ll) {
+    if (ll.length < 3) return 0;
+    var lat0 = ll.reduce(function (s, p) { return s + p[0]; }, 0) / ll.length;
+    var k = Math.cos(lat0 * Math.PI / 180);
+    var p = ll.map(function (c) { return [c[1] * 111320 * k, c[0] * 110540]; });
+    var s = 0;
+    for (var i = 0; i < p.length; i++) {
+      var a = p[i], b = p[(i + 1) % p.length];
+      s += a[0] * b[1] - b[0] * a[1];
+    }
+    return Math.abs(s) / 2 / 10000;
+  }
+
+  function render() {
+    poly.setLatLngs(pts);
+    verts.clearLayers();
+    if (mode === 'tap') {
+      pts.forEach(function (p, i) {
+        L.circleMarker(p, { radius: i === 0 ? 7 : 5, color: '#0d1117', weight: 2,
+          fillColor: i === 0 ? '#2ea043' : '#58a6ff', fillOpacity: 1 }).addTo(verts);
+      });
+    }
+    var ha = areaHa(pts);
+    var el = $('#area');
+    if (pts.length < 3) {
+      el.className = 'none';
+      el.textContent = pts.length ? pts.length + ' point' + (pts.length > 1 ? 's' : '') : 'No plot yet';
+      $('#acres').textContent = '';
+    } else {
+      el.className = '';
+      el.textContent = ha.toFixed(ha < 10 ? 2 : 1) + ' ha';
+      $('#acres').textContent = '= ' + (ha / 0.40468564224).toFixed(ha < 10 ? 2 : 1) + ' acres';
+    }
+    $('#pts').textContent = pts.length ? pts.length + ' pts' : '';
+    $('#undo').disabled = !pts.length;
+    $('#clear').disabled = !pts.length;
+    var ready = pts.length >= 3;
+    $('#save').disabled = !ready;
+    $('#save').textContent = ready
+      ? 'Send plot to bot · ' + ha.toFixed(ha < 10 ? 2 : 1) + ' ha'
+      : (pts.length ? 'Add ' + (3 - pts.length) + ' more point' +
+         (3 - pts.length > 1 ? 's' : '') : 'Draw your plot first');
+  }
+
+  map.on('click', function (e) {
+    if (mode !== 'tap') return;
+    if (pts.length >= 3) {
+      var first = map.latLngToContainerPoint(pts[0]);
+      var here = map.latLngToContainerPoint(e.latlng);
+      if (first.distanceTo(here) < 22) { render(); return; }   // tapped the start = close
+    }
+    pts.push([e.latlng.lat, e.latlng.lng]);
+    render();
+  });
+
+  // Freehand tracing.
+  // On iOS WebKit, preventDefault() on a POINTER event does not suppress the native
+  // drag gesture, which is what Telegram uses to dismiss the Mini App. It has to be
+  // preventDefault() on the TOUCH event, with passive:false. Hence two code paths.
+  var tracing = false;
+  var mapEl = map.getContainer();
+
+  function toLatLngXY(x, y) {
+    var r = mapEl.getBoundingClientRect();
+    return map.containerPointToLatLng(L.point(x - r.left, y - r.top));
+  }
+  function startTrace(x, y) {
+    tracing = true; pts = [];
+    map.dragging.disable();
+    var ll = toLatLngXY(x, y);
+    pts.push([ll.lat, ll.lng]);
+    render();
+  }
+  function moveTrace(x, y) {
+    if (!tracing) return;
+    var ll = toLatLngXY(x, y), last = pts[pts.length - 1];
+    if (last) {
+      var a = map.latLngToContainerPoint(last), b = map.latLngToContainerPoint(ll);
+      if (a.distanceTo(b) < 6) return;                   // thin the trace
+    }
+    pts.push([ll.lat, ll.lng]); render();
+  }
+  function endTrace() {
+    if (!tracing) return;
+    tracing = false; map.dragging.enable(); render();
+  }
+
+  mapEl.addEventListener('touchstart', function (ev) {
+    if (mode !== 'free' || ev.touches.length !== 1) return;
+    ev.preventDefault();
+    startTrace(ev.touches[0].clientX, ev.touches[0].clientY);
+  }, { passive: false });
+  mapEl.addEventListener('touchmove', function (ev) {
+    if (!tracing) return;
+    ev.preventDefault();
+    moveTrace(ev.touches[0].clientX, ev.touches[0].clientY);
+  }, { passive: false });
+  mapEl.addEventListener('touchend', endTrace);
+  mapEl.addEventListener('touchcancel', endTrace);
+
+  // Belt and braces: while a trace is in progress nothing may scroll the webview,
+  // which is what triggers Telegram's pull-to-dismiss.
+  document.addEventListener('touchmove', function (ev) {
+    if (tracing) ev.preventDefault();
+  }, { passive: false });
+
+  // Mouse only - touch is handled above, so ignore synthesized pointer events.
+  mapEl.addEventListener('pointerdown', function (ev) {
+    if (mode !== 'free' || ev.pointerType === 'touch' || !ev.isPrimary) return;
+    startTrace(ev.clientX, ev.clientY); ev.preventDefault();
+  });
+  mapEl.addEventListener('pointermove', function (ev) {
+    if (!tracing || ev.pointerType === 'touch') return;
+    moveTrace(ev.clientX, ev.clientY); ev.preventDefault();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
+    mapEl.addEventListener(t, function (ev) {
+      if (ev.pointerType === 'touch') return;
+      endTrace();
+    });
+  });
+
+  document.querySelectorAll('.mode').forEach(function (b) {
+    b.onclick = function () {
+      mode = b.dataset.mode;
+      document.querySelectorAll('.mode').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      document.body.classList.toggle('drawing', mode === 'free');
+      $('#hint').textContent = mode === 'free'
+        ? 'Hold and drag one finger around the edge of your field.'
+        : 'Tap each corner of your field. Tap the first point to close it.';
+      pts = []; render();
+    };
+  });
+  $('#undo').onclick = function () { pts.pop(); render(); };
+  $('#clear').onclick = function () { pts = []; render(); };
+
+  function payload() {
+    var p = pts.slice();
+    var MAX = 110;                       // keeps the JSON under Telegram's 4096-byte cap
+    if (p.length > MAX) {
+      var step = p.length / MAX, out = [];
+      for (var i = 0; i < MAX; i++) out.push(p[Math.floor(i * step)]);
+      p = out;
+    }
+    return {
+      coordinates: p.map(function (c) {
+        return [Number(c[1].toFixed(5)), Number(c[0].toFixed(5))];   // [lon,lat], ~1 m
+      }),
+      area_ha: Number(areaHa(pts).toFixed(4))                        // area from FULL trace
+    };
+  }
+
+  function closeSoon() {
+    // Show the tick, then get out of the way. sendData already closes the app on
+    // most clients; this covers the ones where it does not.
+    if (!TGRAW) return;
+    setTimeout(function () { try { TGRAW.close(); } catch (e) {} }, 1100);
+  }
+
+  function doSend() {
+    var btn = $('#save'); btn.disabled = true; btn.textContent = 'Sending…';
+    $('#msg').textContent = ''; $('#msg').className = '';
+    var body = payload();
+
+    function done(txt) {
+      $('#msg').className = 'ok';
+      $('#msg').textContent = txt;
+      btn.textContent = 'Sent ✓';
+      closeSoon();
+    }
+    function failed(m) {
+      $('#msg').className = 'err';
+      $('#msg').textContent = 'Could not send: ' + m;
+      btn.disabled = false; btn.textContent = 'Send plot to bot';
+    }
+    function viaTelegram(payloadObj, msg) {
+      // Show the tick BEFORE sending: sendData makes Telegram close the Mini App
+      // itself, often immediately, so sending first can flash the confirmation away.
+      $('#msg').className = 'ok';
+      $('#msg').textContent = msg;
+      btn.textContent = 'Sent ✓';
+      setTimeout(function () {
+        try { TG.sendData(JSON.stringify(payloadObj)); } catch (e) {}
+        setTimeout(function () { try { TGRAW.close(); } catch (e) {} }, 300);
+      }, 1000);
+    }
+
+    // Archive first: every drawn field is kept, whether or not the chat relay works.
+    // Hard timeout: the store machine sleeps when idle, and a cold start used to
+    // leave this promise pending forever with the button stuck on "Sending...".
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var timer = setTimeout(function () { try { ctrl && ctrl.abort(); } catch (e) {} }, 6000);
+
+    fetch(STORE + '/plots/' + encodeURIComponent(TOKEN || 'anon'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { clearTimeout(timer); return r.json(); })
+      .then(function (j) {
+        if (!j || !j.id) throw new Error(j && j.error ? j.error : 'store failed');
+        // The store shares a process with the bot, so a relayed plot is already
+        // being answered in the chat - no sendData round-trip needed. That also
+        // means this works from an inline button, where sendData is unavailable.
+        if (j.relayed) {
+          done('Sent. Go back to Telegram for your result.');
+          return;
+        }
+        if (TG) { viaTelegram({ plot_id: j.id }, 'Sent. Returning to the chat…'); return; }
+        done('Saved. Open the bot and tap “Draw my field” to link it.');
+      })
+      .catch(function (e) {
+        clearTimeout(timer);
+        // Store slow or unreachable: inside Telegram deliver the polygon directly.
+        if (TG) { viaTelegram(body, 'Sent. Returning to the chat…'); return; }
+        failed(e.name === 'AbortError' ? 'server too slow, try again' : e.message);
+      });
+  }
+
+  $('#save').onclick = doSend;
+
+
+  render();
+})();
+</script>
+</body>
+</html>

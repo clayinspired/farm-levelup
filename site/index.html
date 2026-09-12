@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money grows on trees. Farmers are the last to find out.</title>
+<meta name="description" content="Companies pay to have trees planted and kept standing. Find out free, in about a minute, whether your land qualifies and what it would really pay.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/map/vendor/leaflet.css">
+<style>
+:root{
+  --ground:#12161b; --raise:#1a2027; --edge:#28313b;
+  --ink:#eef2f5; --soft:#9aa6b2; --dim:#6f7b87;
+  /* the NDFI ramp this tool actually renders */
+  --rust:#c4553a; --sand:#e3d3a4; --leaf:#2f7d55; --live:#4ec46f;
+  --sans:"Archivo",system-ui,sans-serif;
+  --serif:"Source Serif 4",Georgia,serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--serif);
+  font-size:17px;line-height:1.72;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.sans{font-family:var(--sans)}
+a{color:inherit}
+button,a.btn{font-family:var(--sans);cursor:pointer}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:3px}
+
+.wrap{max-width:1160px;margin:0 auto;padding-left:22px;padding-right:22px}
+
+/* ---------- masthead ---------- */
+header{position:relative;z-index:5}
+.mast{display:flex;align-items:center;justify-content:space-between;
+  padding-block:20px;gap:16px}
+.brand{min-width:0}
+.logo{font-family:var(--sans);font-weight:800;font-size:17px;letter-spacing:-.02em}
+.what{font-family:var(--sans);font-size:12.5px;color:var(--dim);margin:2px 0 0;
+  letter-spacing:-.005em;line-height:1.35}
+.logo em{font-style:normal;color:var(--live)}
+.btn{display:inline-block;border:none;border-radius:2px;font-weight:700;
+  text-decoration:none;letter-spacing:-.01em;transition:background .15s,color .15s}
+.btn-go{background:var(--live);color:#06210f;padding:13px 22px;font-size:15.5px}
+.btn-ghost{background:none;color:var(--ink);border:1px solid var(--edge);
+  padding:12px 21px;font-size:15.5px}
+@media (hover:hover){
+  .btn-go:hover{background:#68d786}
+  .btn-ghost:hover{border-color:var(--soft)}
+}
+.mast .btn-go{padding:10px 17px;font-size:14.5px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:1.02fr 1fr;gap:54px;align-items:center;
+  padding-block:46px 76px}
+h1{font-size:clamp(38px,5.4vw,66px);line-height:1.02;letter-spacing:-.035em;
+  font-weight:800;margin:0 0 22px}
+h1 .q{display:block;color:var(--soft);font-weight:500;
+  font-size:clamp(21px,2.5vw,29px);letter-spacing:-.02em;line-height:1.25;
+  margin-bottom:14px}
+.lede{font-size:18.5px;color:var(--soft);max-width:46ch;margin:0 0 16px}
+.lede strong{color:var(--ink);font-weight:600}
+.lede.two{font-size:17px;color:var(--dim);margin-bottom:30px}
+.acts{display:flex;gap:12px;flex-wrap:wrap}
+.free{margin-top:16px;font-size:14.5px;color:var(--dim);font-family:var(--sans)}
+
+/* hero map: the product's own output, used as the picture */
+.shot{position:relative;border:1px solid var(--edge);border-radius:3px;overflow:hidden;
+  background:#000;aspect-ratio:4/3.35}
+#heromap{position:absolute;inset:0}
+.shot .tag{position:absolute;left:14px;bottom:14px;z-index:600;
+  background:rgba(18,22,27,.93);border:1px solid var(--edge);border-radius:2px;
+  padding:10px 13px;font-family:var(--sans);font-size:13px;line-height:1.45;
+  max-width:min(280px,calc(100% - 28px))}
+.shot .tag > b{display:block;font-size:14px;color:var(--live);font-weight:700;
+  letter-spacing:-.01em;margin-bottom:2px}
+.shot .tag span{color:var(--soft)}
+.shot .tag .hl{display:inline;color:var(--ink);font-weight:700;white-space:nowrap}
+.shot .site{position:absolute;right:14px;top:14px;z-index:600;
+  background:rgba(18,22,27,.93);border:1px solid var(--edge);border-radius:2px;
+  padding:7px 11px;font-family:var(--sans);font-size:12.5px;color:var(--soft)}
+
+/* ---------- the argument ---------- */
+section{padding-block:70px}
+.rule{border:0;border-top:1px solid var(--edge);margin:0}
+h2{font-size:clamp(27px,3.4vw,38px);line-height:1.14;letter-spacing:-.03em;
+  font-weight:800;margin:0 0 14px;max-width:19ch}
+.sub{color:var(--soft);max-width:60ch;margin:0 0 40px;font-size:17.5px}
+
+.claims{display:grid;gap:0}
+.claim{display:grid;grid-template-columns:minmax(168px,auto) 1fr;gap:34px;
+  padding-block:26px;border-top:1px solid var(--edge);align-items:start}
+.claim:last-child{border-bottom:1px solid var(--edge)}
+.fig{font-family:var(--sans);font-weight:800;letter-spacing:-.04em;
+  font-size:clamp(34px,4.6vw,50px);line-height:1;color:var(--sand)}
+.fig.bad{color:var(--rust)}
+.claim p{margin:0;color:var(--soft);max-width:52ch}
+.claim p strong{color:var(--ink);font-weight:600}
+
+/* ---------- revenue comparison ---------- */
+.money{margin:0 0 26px;padding:0;border-top:1px solid var(--edge)}
+.money figcaption{font-family:var(--sans);font-size:13px;font-weight:700;color:var(--dim);
+  padding:16px 0 4px}
+.mrow{display:grid;grid-template-columns:minmax(180px,1.05fr) minmax(90px,2.4fr) auto;
+  gap:20px;align-items:center;padding:15px 0;border-top:1px solid var(--edge)}
+.mlab{font-family:var(--sans);font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+.mlab span{display:block;font-weight:500;font-size:13px;color:var(--dim);margin-top:2px}
+.mbar{height:13px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.mbar i{display:block;height:100%;min-width:4px;border-radius:0 3px 3px 0}
+.mval{font-family:var(--sans);font-weight:800;font-size:clamp(23px,2.6vw,30px);
+  letter-spacing:-.03em;text-align:right;font-variant-numeric:tabular-nums;min-width:112px}
+.mval span{display:block;font-weight:500;font-size:12.5px;color:var(--dim);
+  letter-spacing:0;margin-top:1px}
+.mval.add{color:var(--live)}
+.take{color:var(--soft);max-width:60ch;margin:0 0 12px}
+.take strong{color:var(--ink);font-weight:600}
+.take.dim{color:var(--dim);font-size:15.5px}
+
+/* ---------- sequence (genuinely a sequence) ---------- */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:34px;counter-reset:s}
+.step{counter-increment:s}
+.step h3{margin:0 0 7px;font-size:18px;font-weight:700;letter-spacing:-.02em;
+  display:flex;align-items:baseline;gap:11px}
+.step h3::before{content:counter(s);font-size:13px;font-weight:700;color:var(--live);
+  border:1px solid var(--leaf);border-radius:50%;width:24px;height:24px;flex:none;
+  display:inline-grid;place-items:center;line-height:1}
+.step p{margin:0;color:var(--soft);font-size:16px}
+
+/* ---------- evidence ---------- */
+.evi{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:15px}
+.evi th{text-align:left;font-weight:700;color:var(--dim);font-size:13px;
+  padding:0 10px 10px 0;border-bottom:1px solid var(--edge)}
+.evi td{padding:11px 10px 11px 0;border-bottom:1px solid rgba(40,49,59,.6);
+  font-variant-numeric:tabular-nums}
+.evi td:nth-child(n+3){text-align:right}
+.verd{font-size:12.5px;font-weight:700;padding:2px 8px;border-radius:2px}
+.v-pass{background:rgba(78,196,111,.14);color:var(--live)}
+.v-cond{background:rgba(227,211,164,.14);color:var(--sand)}
+.v-fail{background:rgba(196,85,58,.18);color:var(--rust)}
+.scroller{overflow-x:auto}
+.after{color:var(--soft);margin:26px 0 0;max-width:62ch}
+
+/* ---------- honesty ---------- */
+.plain{background:var(--raise);border-left:2px solid var(--rust);
+  padding:32px 34px;max-width:66ch}
+.plain h2{margin-bottom:16px}
+.plain p{color:var(--soft);margin:0 0 14px}
+.plain p:last-child{margin-bottom:0}
+.plain strong{color:var(--ink);font-weight:600}
+
+/* ---------- trade band: secondary audience, deliberately quieter ---------- */
+.trade{font-size:15px}
+.trade h2{font-size:clamp(21px,2.4vw,27px);max-width:24ch;margin-bottom:12px}
+.tsub{color:var(--soft);max-width:66ch;margin:0 0 34px;font-size:15.5px}
+.tcols{display:grid;grid-template-columns:1fr 1.15fr;gap:46px;align-items:start}
+.trade h3{font-size:14px;font-weight:700;letter-spacing:-.01em;margin:0 0 12px;
+  color:var(--sand)}
+.tcols p{color:var(--soft);margin:0 0 12px;font-size:15px;max-width:46ch}
+.spec{margin:0;display:grid;grid-template-columns:auto 1fr;gap:0 18px;
+  font-family:var(--sans);font-size:13.5px;line-height:1.55}
+.spec dt{font-weight:700;color:var(--ink);padding:9px 0;white-space:nowrap;
+  border-top:1px solid var(--edge)}
+.spec dd{margin:0;color:var(--soft);padding:9px 0;border-top:1px solid var(--edge)}
+.spec em{font-style:normal;color:var(--sand)}
+.tfoot{margin:34px 0 0;color:var(--dim);font-size:13.5px;line-height:1.65;max-width:92ch}
+
+/* ---------- close ---------- */
+.close{text-align:center;padding-block:84px}
+.close h2{margin:0 auto 16px;max-width:17ch}
+.close .sub{margin:0 auto 30px}
+.close .acts{justify-content:center}
+footer{border-top:1px solid var(--edge);padding-block:34px 46px;
+  color:var(--dim);font-size:14px}
+footer p{margin:0 0 9px;max-width:74ch}
+footer a{color:var(--soft)}
+
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:34px;padding-block:26px 54px}
+  .what{display:none}          /* headline and lede carry it at phone width */
+  .shot{aspect-ratio:5/4}
+  .steps{grid-template-columns:1fr;gap:26px}
+  .mrow{grid-template-columns:1fr auto;gap:8px 14px;padding:14px 0}
+  .mbar{grid-column:1/-1;order:3}
+  .mval{font-size:25px;min-width:0}
+  section{padding-block:52px}
+  .plain{padding:26px 22px}
+  .tcols{grid-template-columns:1fr;gap:30px}
+  .spec{grid-template-columns:1fr;gap:0}
+  .spec dt{padding-bottom:2px}
+  .spec dd{border-top:0;padding-top:0;padding-bottom:11px}
+  .close{padding-block:62px}
+}
+@media (pointer:coarse){input,select,textarea{font-size:16px}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <div class="mast">
+    <div class="brand">
+      <div class="logo">farm<em>level</em>up</div>
+      <p class="what">Land eligibility screening for Verra VM0047 reforestation projects</p>
+    </div>
+    <a class="btn btn-go" id="nav-bot" href="#start">Check my land</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div>
+    <h1><span class="q">Money grows on trees, they say.</span>
+      It does. Farmers are the last to find out.</h1>
+    <p class="lede">Send a location and this tells you whether that land can be
+      registered for reforestation carbon credits under <strong>Verra VM0047</strong>, and
+      what it would really pay. It reads ten years of satellite history and applies the
+      methodology's own tests. Free, in about a minute.</p>
+    <p class="lede two">Airlines and technology companies already pay for those trees.
+      The people farming the land have never been told whether theirs qualifies.</p>
+    <div class="acts">
+      <a class="btn btn-go" id="hero-bot" href="#start">Check my land</a>
+      <a class="btn btn-ghost" href="map/">See 19 places we checked</a>
+    </div>
+    <p class="free">Free, on any phone that runs Telegram. No account, nothing to upload.</p>
+  </div>
+
+  <div class="shot">
+    <div id="heromap" aria-label="Satellite view of a screened site in northeastern Thailand with its boundary drawn"></div>
+    <div class="site">Roi Et, Thailand</div>
+    <div class="tag"><b>This land qualifies</b><span>No forest in ten years, nothing cleared, and tree cover
+      here is already rising. Planted with moringa it could earn about
+      <b class="hl">$1,200</b> a hectare a year, plus roughly <b class="hl">$70</b>
+      of carbon.</span></div>
+  </div>
+</div>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section>
+  <h2>The land is yours. The information never was.</h2>
+  <p class="sub">Buyers, brokers and plantation operators all work from the same public
+    satellite record. It has simply never been pointed at a smallholding and explained
+    in words a farmer can act on.</p>
+
+  <figure class="money" data-palette="#b87d18,#3a8cc8">
+    <figcaption>What one hectare earns in a year</figcaption>
+
+    <div class="mrow">
+      <div class="mlab">Left as it is<span>grazing on degraded land</span></div>
+      <div class="mbar"><i style="width:2.4%;background:#b87d18"></i></div>
+      <div class="mval">$30<span>$10–55</span></div>
+    </div>
+
+    <div class="mrow">
+      <div class="mlab">Planted with moringa<span>leaves and seed</span></div>
+      <div class="mbar"><i style="width:96%;background:#3a8cc8"></i></div>
+      <div class="mval">$1,200<span>$300–3,500</span></div>
+    </div>
+
+    <div class="mrow">
+      <div class="mlab">Carbon credits on top<span>only if the trees stay standing</span></div>
+      <div class="mbar"><i style="width:5.6%;background:#4ec46f"></i></div>
+      <div class="mval add">+$70<span>$10–266</span></div>
+    </div>
+  </figure>
+
+  <p class="take"><strong>The trees are the money.</strong> Planting moringa on grazed
+    land is roughly a fortyfold move. Carbon adds a few percent on top — worth taking,
+    and it compounds, but nobody should plant for carbon alone.</p>
+  <p class="take dim">What carbon really buys is the paperwork. About
+    <strong>eighty hectares</strong> of farmers together covers the cost of certifying a
+    project; five hundred hectares earns roughly <strong>$35,000 a year</strong>. That is
+    why this only works when farmers go in together — and why the first useful thing
+    anyone can do is find out whether the land counts.</p>
+</section>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section>
+  <h2>From your phone, in about a minute</h2>
+  <p class="sub">It reads the same satellite record an auditor would, across the ten
+    years the rules care about, and applies the checks that decide whether land counts.</p>
+  <div class="steps">
+    <div class="step">
+      <h3>Send where the land is</h3>
+      <p>Drop a pin in Telegram while you are standing on it, or type the coordinates.
+        Nothing to install.</p>
+    </div>
+    <div class="step">
+      <h3>Get a straight answer</h3>
+      <p>Whether it qualifies, why, and what a hectare would really earn if the trees
+        are left to stand.</p>
+    </div>
+    <div class="step">
+      <h3>Draw your field</h3>
+      <p>Trace the boundary with a finger. The check runs again on your actual shape,
+        not a square around a pin.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section>
+  <h2>Nineteen places, checked the same way</h2>
+  <p class="sub">Across Southeast Asia and Africa, 2016 to 2026. Thirteen qualified.
+    Six did not, and their farmers would have found out the slow way.</p>
+  <div class="scroller">
+    <table class="evi">
+      <tr><th>Site</th><th>Verdict</th><th>Peak tree cover</th><th>Cleared</th></tr>
+      <tr><td>Zinder, Niger</td><td><span class="verd v-pass">Eligible</span></td><td>0.0%</td><td>0.00%</td></tr>
+      <tr><td>Tigray, Ethiopia</td><td><span class="verd v-pass">Eligible</span></td><td>0.1%</td><td>0.00%</td></tr>
+      <tr><td>Magway, Myanmar</td><td><span class="verd v-pass">Eligible</span></td><td>0.1%</td><td>0.00%</td></tr>
+      <tr><td>Sumba, Indonesia</td><td><span class="verd v-pass">Eligible</span></td><td>9.7%</td><td>0.27%</td></tr>
+      <tr><td>Kakamega, Kenya</td><td><span class="verd v-cond">Conditional</span></td><td>29.1%</td><td>2.66%</td></tr>
+      <tr><td>East Kalimantan, Indonesia</td><td><span class="verd v-fail">Not suitable</span></td><td>50.5%</td><td>30.54%</td></tr>
+    </table>
+  </div>
+  <p class="after">Almost everything that qualified is dry country — Sahel parkland,
+    miombo, semi-arid scrub, Southeast Asia's dry corridor. That is not how we chose
+    them; it is where the rules happen to land. Wet tropical sites fail on the forest
+    they already have, or on cloud: the Kalimantan site sits under 57–71% cloud in
+    <em>every</em> month of the year, so no honest reading is possible there at all.</p>
+</section>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section>
+  <div class="plain">
+    <h2>Why we show you the small number first</h2>
+    <p>Carbon pays for wood that <strong>stays standing</strong>. The usual moringa
+      business cuts the trees back several times a year for the leaves, which drops the
+      payment by roughly five times. The two pull against each other, and you
+      deserve to hear it before you plant, not after.</p>
+    <p>Money also arrives <strong>years later</strong>, once someone has come and
+      measured the trees. There is no upfront cheque.</p>
+    <p>For most smallholders the honest answer is to <strong>join with other farmers</strong>
+      rather than go alone. That is not a small ambition — it is the only version of this
+      that has ever paid. We would rather hand you a real number and a real route than a
+      headline you cannot bank.</p>
+  </div>
+</section>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section class="trade">
+  <h2>If you are on the other side of this market</h2>
+  <p class="tsub">Buyers, developers and validators are short of one thing: high-integrity
+    removals with credible origination. Smallholder aggregation is where the volume is,
+    and screening cost is what keeps it out of reach. This is that screen, run against
+    the methodology's own tests rather than a generic tree-cover proxy.</p>
+
+  <div class="tcols">
+    <div>
+      <h3>Why it moves a pipeline</h3>
+      <p>A feasibility study is the wrong place to discover that land was forest eight
+        years ago. Screening a portfolio first means capital goes to parcels that can
+        actually be validated, and the ones that cannot are dropped before anyone has
+        paid for a field visit.</p>
+      <p>It also produces the artefact a grouped project needs: a per-parcel boundary,
+        drawn by the person who farms it, with a dated satellite record attached.</p>
+    </div>
+    <div>
+      <h3>What is actually implemented</h3>
+      <dl class="spec">
+        <dt>Applicability §4 #11a</dt><dd>non-forest through <em>t−10…t0</em> at the host
+          country's crown-cover definition, against the 10% pre-existing woody limit</dd>
+        <dt>Applicability §4 #13</dt><dd>removal of comparable woody biomass inside the
+          window, measured as cleared <em>area</em> against a de-minimis threshold, not
+          pixel presence</dd>
+        <dt>Section 8</dt><dd>ordinary least squares on the stocking index across the
+          window; a significant negative slope is reported as indicating prior clearing</dd>
+        <dt>Appendix 1, Table A1</dt><dd>30 m resolution floor respected — no coarser
+          layer is used anywhere in the decision</dd>
+        <dt>Appendix 1, Table A2</dt><dd>at least three time points, including one in
+          <em>[t−10, t−8]</em> and one at <em>t0</em>, from a season-matched composite</dd>
+      </dl>
+    </div>
+  </div>
+
+  <p class="tfoot">Stocking index is NDFI after Souza et al. (2005) — the worked example
+    VM0047 itself names — over Landsat Collection 2 surface reflectance, the only free
+    optical archive covering the full look-back uniformly at 30 m. Forest state comes from
+    Hansen Global Forest Change v1.13 (2000–2025). VM0047 is the first VCS methodology to
+    use dynamic performance benchmarks, and both v1.0 and v1.1 are ICVCM CCP-approved; the
+    annual index series here is the input those control-plot matching steps consume.
+    Screening only — it does not replace a VVB, a host-country forest definition, tenure
+    evidence, wetland and peat screening, or field measurement.</p>
+</section>
+</div>
+
+<hr class="rule">
+
+<div class="wrap">
+<section class="close" id="start">
+  <h2>Start with one field</h2>
+  <p class="sub">Your parents farmed this land and their parents before them. What
+    grows on it next could be worth more than the harvest — but only if somebody finally
+    tells you what you are standing on.</p>
+  <div class="acts">
+    <a class="btn btn-go" id="cta-bot" href="#">Check my land</a>
+    <a class="btn btn-ghost" href="map/">Look at the map first</a>
+  </div>
+</section>
+</div>
+
+<div class="wrap">
+<footer>
+  <p>Screening only. This is a first filter, not an eligibility determination: your
+    country's legal forest definition, land tenure, wetland and peat soils, field
+    measurement and an accredited auditor all still decide it.</p>
+  <p>Built on Hansen Global Forest Change v1.13 and Landsat Collection 2 surface
+    reflectance, with an NDFI stocking index after Souza et al. (2005). Basemap imagery
+    by Esri. Methodology: <a href="https://verra.org/methodologies/vm0047-afforestation-reforestation-and-revegetation-v1-1/">Verra VM0047</a>.</p>
+</footer>
+</div>
+
+<script src="/config.js"></script>
+<script src="/map/vendor/leaflet.js"></script>
+<script>
+(function () {
+  // Point every call-to-action at the bot from deployment config; if it is not
+  // configured, fall back to the map rather than showing a dead button.
+  var bot = (window.FARM && window.FARM.bot) || '';
+  ['nav-bot', 'hero-bot', 'cta-bot'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (bot) { el.href = bot; }
+    else if (el.getAttribute('href') === '#') { el.href = 'map/'; el.textContent = 'Explore the screening map'; }
+  });
+
+  // Hero picture is the product's own output: a real screened site, its boundary,
+  // and the verdict. Static on purpose - it illustrates, it does not invite panning.
+  var el = document.getElementById('heromap');
+  if (!el || !window.L) return;
+  var bbox = [[15.45, 103.35], [15.55, 103.45]];       // Roi Et sample site
+  var map = L.map(el, {
+    zoomControl: false, attributionControl: false, dragging: false,
+    scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false,
+    boxZoom: false, keyboard: false
+  });
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 18 }).addTo(map);
+  map.fitBounds(bbox, { padding: [26, 26] });
+
+  var ring = L.rectangle(bbox, {
+    color: '#4ec46f', weight: 2, fill: true, fillColor: '#4ec46f', fillOpacity: .1
+  }).addTo(map);
+
+  // One orchestrated moment: the boundary draws itself, which is what the tool does.
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var path = ring.getElement && ring.getElement();
+  if (path && !reduce) {
+    var len = path.getTotalLength ? path.getTotalLength() : 0;
+    if (len) {
+      path.style.strokeDasharray = len;
+      path.style.strokeDashoffset = len;
+      path.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)';
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { path.style.strokeDashoffset = 0; });
+      });
+    }
+  }
+  window.addEventListener('resize', function () { map.fitBounds(bbox, { padding: [26, 26] }); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[project]
+name = "farm-levelup"
+version = "0.1.0"
+description = "Annual satellite time series + VM0047 land-eligibility screening for SE Asia and Africa"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.14.3",
+    "geopandas>=1.1.4",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "odc-stac>=0.5.3",
+    "pandas>=3.0.5",
+    "planetary-computer>=1.0.0",
+    "pystac-client>=0.9.0",
+    "python-dotenv>=1.2.3",
+    "python-telegram-bot>=22.8",
+    "rasterio>=1.5.1",
+    "rioxarray>=0.23.0",
+    "scipy>=1.18.1",
+    "shapely>=2.1.2",
+]

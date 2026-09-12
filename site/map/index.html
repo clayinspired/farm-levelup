@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VM0047 Land Screening — SE Asia &amp; Africa</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel-2:#1c232c; --line:#2a323d;
+  --ink:#e6edf3; --muted:#8b949e; --dim:#6b7685;
+  --pass:#3fb950; --cond:#d29922; --fail:#f85149; --accent:#58a6ff;
+  --sea:#7c6cf0; --afr:#e5915c;
+  --sheet-h:33vh;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  overflow:hidden;-webkit-font-smoothing:antialiased}
+button,input,select{font-family:inherit;color:var(--ink)}
+button{background:none;border:none;cursor:pointer;color:var(--ink)}
+button:focus,input:focus{outline:none}
+body.kbd button:focus-visible,body.kbd input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#app{display:grid;grid-template-columns:296px 1fr;height:100%;overflow:hidden}
+#side,#mapwrap{min-width:0;min-height:0}
+
+/* ---------- sidebar ---------- */
+#side{background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+.brand{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:15px;letter-spacing:-.01em;font-weight:650;
+  overflow-wrap:break-word}
+.brand p{margin:4px 0 0;font-size:11.5px;color:var(--muted);line-height:1.45}
+#filters{display:flex;gap:5px;padding:10px 16px 4px;flex-wrap:wrap}
+.fchip{padding:4px 9px;border-radius:5px;font-size:11px;font-weight:650;
+  background:var(--panel-2);color:var(--muted);border:1px solid transparent}
+.fchip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+@media (hover:hover){.fchip:not([aria-pressed="true"]):hover{color:var(--ink)}}
+.fchip .n{opacity:.65;font-weight:600;margin-left:3px}
+.sect{padding:12px 16px 6px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);font-weight:650;display:flex;align-items:center;gap:7px}
+.sect .dot{width:7px;height:7px;border-radius:2px;flex:none}
+#list{overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;min-width:0;padding-bottom:10px}
+.aoi{width:100%;max-width:100%;text-align:left;padding:9px 16px;
+  border-left:2px solid transparent;display:block;min-width:0;
+  transition:background .12s}
+.aoi .nm{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;
+  min-width:0}
+.aoi .nm>:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aoi .sb{display:block;font-size:11px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aoi[aria-current="true"]{background:var(--panel-2);border-left-color:var(--accent)}
+@media (hover:hover){.aoi:hover{background:#1a212a}}
+.pill{font-size:9.5px;font-weight:700;letter-spacing:.05em;padding:2px 6px;border-radius:3px;
+  text-transform:uppercase;flex:none}
+.p-pass{background:rgba(63,185,80,.15);color:var(--pass)}
+.p-cond{background:rgba(210,153,34,.16);color:var(--cond)}
+.p-fail{background:rgba(248,81,73,.15);color:var(--fail)}
+
+/* ---------- map ---------- */
+#mapwrap{position:relative;min-width:0}
+#map{position:absolute;inset:0;background:#000}
+.leaflet-container{background:#000;font-family:inherit}
+
+.ov{position:absolute;z-index:500;background:rgba(13,17,23,.92);border:1px solid var(--line);
+  border-radius:9px;backdrop-filter:blur(9px)}
+#legend{top:12px;right:12px;padding:11px 13px;width:186px}
+#legend .t{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);
+  font-weight:650;margin-bottom:8px}
+.ramp{height:9px;border-radius:5px;
+  background:linear-gradient(90deg,#b4462f,#d98a5b,#e8d8a8,#7aa867,#1b4d3e)}
+.rlab{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px}
+.lrow{display:flex;align-items:center;gap:8px;font-size:11.5px;margin-top:9px}
+.sw{width:13px;height:13px;border-radius:3px;flex:none;background:rgba(35,140,90,.75)}
+
+#ctrl{top:12px;left:12px;padding:9px;display:flex;gap:5px}
+.seg{padding:6px 11px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.seg[aria-pressed="true"]{background:var(--accent);color:#06131f}
+@media (hover:hover){.seg:not([aria-pressed="true"]):hover{background:#222a34;color:var(--ink)}}
+
+/* ---------- timeline ---------- */
+#time{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;z-index:600;
+  width:min(660px,calc(100% - 24px));padding:13px 17px 11px}
+.trow{display:flex;align-items:center;gap:13px}
+#play{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#06131f;
+  display:grid;place-items:center;flex:none}
+#yr{font-size:25px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+  min-width:66px}
+#yrsub{font-size:10.5px;color:var(--muted);margin-top:-3px}
+#scrub{flex:1;-webkit-appearance:none;appearance:none;background:none;height:26px}
+#scrub::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line)}
+#scrub::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--accent);margin-top:-5.5px;border:2px solid var(--bg)}
+#scrub::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--accent);
+  border:2px solid var(--bg)}
+#ticks{display:flex;justify-content:space-between;margin-top:5px;font-size:9.5px;
+  color:var(--dim);font-variant-numeric:tabular-nums}
+#ticks span.on{color:var(--accent);font-weight:700}
+.tick-loss{color:var(--fail)!important;font-weight:700}
+
+/* ---------- detail ---------- */
+#detail{position:absolute;right:12px;bottom:16px;z-index:550;width:268px;padding:14px;
+  max-height:calc(100% - 210px);overflow-y:auto}
+.dpanel{min-width:0}
+.dpanel .mrow span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;padding-right:8px}
+.dpanel h2{margin:0 0 2px;font-size:13.5px;font-weight:650}
+.dpanel .loc{font-size:11px;color:var(--muted);margin-bottom:10px}
+.verdict{padding:7px 9px;border-radius:6px;font-size:11px;font-weight:600;margin-bottom:11px;
+  line-height:1.35}
+.v-pass{background:rgba(63,185,80,.12);color:var(--pass)}
+.v-cond{background:rgba(210,153,34,.12);color:var(--cond)}
+.v-fail{background:rgba(248,81,73,.12);color:var(--fail)}
+.mrow{display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;
+  border-bottom:1px solid rgba(42,50,61,.6)}
+.mrow span:first-child{color:var(--muted)}
+.mrow b{font-weight:650;font-variant-numeric:tabular-nums}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:11px;margin-top:8px;line-height:1.4}
+.chk .ic{width:14px;height:14px;border-radius:3px;flex:none;margin-top:1px;
+  display:grid;place-items:center;font-size:9px;font-weight:800}
+.i-pass{background:rgba(63,185,80,.18);color:var(--pass)}
+.i-fail{background:rgba(248,81,73,.18);color:var(--fail)}
+.i-man{background:rgba(139,148,158,.18);color:var(--muted)}
+.spark{margin:11px 0 3px}
+.cap{font-size:10px;color:var(--dim);margin-top:3px;line-height:1.4}
+.dpanel h3{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);
+  margin:14px 0 4px;font-weight:650}
+
+#mobtabs{display:none}
+#detail-m{display:none}   /* desktop uses the floating #detail panel */
+.hint{position:absolute;bottom:0;left:0;right:0;z-index:400}
+.mine-label{background:rgba(13,17,23,.94);border:1px solid #f0b400;color:#f0b400;
+  font-weight:650;font-size:12px;border-radius:7px;box-shadow:none}
+.mine-label::before{border-top-color:#f0b400}
+
+/* ---------- mobile ---------- */
+@media (max-width:860px){
+  #app{grid-template-columns:1fr;grid-template-rows:1fr var(--sheet-h)}
+  #side{grid-row:2;border-right:none;border-top:1px solid var(--line)}
+  #mapwrap{grid-row:1}
+  #detail{display:none}
+  #detail-m{padding:2px 0 16px}
+  .dpanel-m{padding:12px 16px}
+  /* park the legend bottom-left so it clears both the layer buttons and the timeline */
+  #legend{top:auto;right:auto;bottom:112px;left:8px;width:128px;padding:7px 9px}
+  #legend .t{font-size:9px;margin-bottom:6px}
+  .rlab{font-size:9px}
+  #ctrl{top:8px;left:8px;right:8px;padding:6px;justify-content:space-between}
+  .seg{padding:6px 8px;font-size:11px;flex:1;text-align:center}
+  #time{bottom:14px;width:calc(100% - 16px);padding:8px 12px 6px}
+  .leaflet-control-zoom{display:none}
+  .leaflet-control-attribution{font-size:9px;max-width:100%}
+  #legend .lrow{display:none}
+  #yr{font-size:19px;min-width:52px}
+  #yrsub{font-size:9.5px}
+  #play{width:30px;height:30px}
+  .trow{gap:10px}
+  #ticks{margin-top:3px}
+  #filters{padding:7px 16px 3px}
+  .aoi{padding:7px 16px}
+  .sect{padding:8px 16px 4px}
+  .brand{padding:9px 16px 7px}
+  .brand h1{font-size:14px}
+  .brand p{display:none}          /* the map explains itself; reclaim the space */
+  #mobtabs{display:flex;gap:4px;padding:6px 16px 0}
+  #detail-m{display:none}          /* toggled by the Sites/Detail tabs */
+  .mtab{flex:1;padding:6px;border-radius:6px;font-size:11.5px;font-weight:650;
+    background:var(--panel-2);color:var(--muted)}
+  .mtab[aria-pressed="true"]{background:var(--accent);color:#06131f}
+  #list{padding-top:4px}
+}
+@media (pointer:coarse){
+  /* 16px is the exact iOS Safari threshold below which focusing a text-entry
+     control zooms the page. Buttons never trigger it, so they keep their scale. */
+  input,select,textarea{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand">
+      <h1>VM0047 Land Screening</h1>
+      <p>Annual Landsat stocking index &amp; Hansen forest cover, 2016–2026. Southeast Asia &amp; Africa.</p>
+    </div>
+    <div id="mobtabs">
+      <button class="mtab" data-mtab="list" aria-pressed="true">Sites</button>
+      <button class="mtab" data-mtab="detail" aria-pressed="false">Detail</button>
+    </div>
+    <div id="filters"></div>
+    <div id="list"></div>
+    <div id="detail-m"></div>
+  </aside>
+
+  <div id="mapwrap">
+    <div id="map"></div>
+
+    <div id="ctrl" class="ov">
+      <button class="seg" data-layer="ndfi" aria-pressed="true">Stocking index</button>
+      <button class="seg" data-layer="forest" aria-pressed="false">Forest cover</button>
+      <button class="seg" data-layer="none" aria-pressed="false">Imagery</button>
+    </div>
+
+    <div id="legend" class="ov">
+      <div class="t" id="legtitle">NDFI stocking index</div>
+      <div id="legbody">
+        <div class="ramp"></div>
+        <div class="rlab"><span>−1 bare</span><span>+1 canopy</span></div>
+      </div>
+      <div id="legforest" style="display:none">
+        <div class="lrow" style="margin-top:0">
+          <span class="sw"></span>
+          <span>Forest, crown &ge; <b id="legthr">30</b>%</span>
+        </div>
+        <div class="lrow"><span class="sw" style="background:transparent"></span>
+          <span style="color:var(--muted)">Unshaded = non-forest</span></div>
+      </div>
+      <div class="lrow" style="margin-top:10px">
+        <span class="sw" style="background:rgba(88,166,255,.8)"></span>
+        <span>Project AOI boundary</span>
+      </div>
+    </div>
+
+    <div id="time" class="ov">
+      <div class="trow">
+        <button id="play" aria-label="Play timeline">
+          <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true"><path id="pi" d="M3 1.5v9l7-4.5z" fill="currentColor"/></svg>
+        </button>
+        <div>
+          <div id="yr">2026</div>
+          <div id="yrsub">t = 0</div>
+        </div>
+        <input id="scrub" type="range" min="0" max="10" value="10" step="1" aria-label="Year">
+      </div>
+      <div id="ticks"></div>
+    </div>
+
+    <div id="detail" class="ov dpanel"></div>
+  </div>
+</div>
+
+<script src="/config.js"></script>
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

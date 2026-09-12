@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>farm.o2.md</title>
+<style>
+  :root{
+    --bg:#f6f4ee; --panel:#fffdf8; --ink:#1d2a1f; --muted:#5c6b5b;
+    --line:#ddd8c8; --accent:#2f6b3d; --accent-soft:#e4ede1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#11150f; --panel:#181d15; --ink:#e8eee4; --muted:#93a38f;
+      --line:#2b3327; --accent:#7fc08c; --accent-soft:#1e2a1d;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#11150f; --panel:#181d15; --ink:#e8eee4; --muted:#93a38f;
+    --line:#2b3327; --accent:#7fc08c; --accent-soft:#1e2a1d;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:24px;
+  }
+  .card{
+    width:100%; max-width:560px; background:var(--panel);
+    border:1px solid var(--line); border-radius:16px;
+    padding-block:40px; padding-inline:32px;
+  }
+  .mark{display:block; margin-bottom:24px}
+  h1{
+    margin:0 0 6px; font-size:1.65rem; letter-spacing:-.02em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:600;
+  }
+  .tag{
+    display:inline-block; margin-bottom:22px; padding:3px 10px;
+    background:var(--accent-soft); color:var(--accent);
+    border-radius:999px; font-size:.75rem; font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase;
+  }
+  p{margin:0 0 14px; color:var(--muted)}
+  p.lead{color:var(--ink)}
+  hr{border:0; border-top:1px solid var(--line); margin:26px 0 18px}
+  .meta{
+    display:flex; flex-wrap:wrap; gap:6px 18px;
+    font-size:.8rem; color:var(--muted);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <svg class="mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <path d="M20 34V21" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M20 25c-6 0-9-3.6-9-9 6 0 9 3.6 9 9Z" fill="var(--accent)" opacity=".55"/>
+      <path d="M20 21c0-6.6 3.4-10 10-10 0 6.6-3.4 10-10 10Z" fill="var(--accent)"/>
+      <path d="M8 36h24" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" opacity=".35"/>
+    </svg>
+
+    <span class="tag">Placeholder</span>
+    <h1>farm.o2.md</h1>
+    <p class="lead">This subdomain is live and reserved. The real site hasn't been built yet.</p>
+    <p>Parked for a forest / reforestation carbon project. Deployed on Cloudflare Pages so the DNS, TLS and build pipeline are already proven — the content here is the only thing that's temporary.</p>
+
+    <hr>
+    <div class="meta">
+      <span>Cloudflare Pages</span>
+      <span>zone: o2.md</span>
+      <span>set up 2026-09-12</span>
+    </div>
+  </main>
+</body>
+</html>
